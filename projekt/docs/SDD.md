@@ -1,0 +1,1 @@
+TODO: System Design Document pro váš projekt. 

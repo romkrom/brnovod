@@ -1,0 +1,1 @@
+Pro AI Framework se řiď výhradně instrukcemi v souboru AGENTS.md.

@@ -1,0 +1,1 @@
+TODO: Definice projektu a pravidel pro AI asistenta.
