@@ -18,7 +18,8 @@ Podporovat znovupoužitelné komponenty a knihovny.
 Poskytnout rozumné výchozí rámování zobrazení lokalit, aby se mohl zobrazovat jak ve webové aplikaci tak v mobilní aplikaci na výšku i na šířku bez nutnosti další konfigurace.
 Možnost přeposlat vybrané místo zájmu jinému uživateli jak na webu tak v mobilní aplikaci.
 Možnost odkázat na externí mapu ve webové aplikaci a spustit navigaci v mobilu.
-Součástí bude správa účtů, oprávnění, přihlášení uživatele.
+Součástí je správa účtů, oprávnění, přihlášení uživatele.
+Webové rozhraní (frontend) je ve frameworku Svelte v jazyku Typescript, backend ve frameworku Axum v jazyku Rust, databáze je PostgreSQL.
 
 4. Co není cílem (Non-Goals)
 Vytvoření dalšího blogu kudyznudy.cz, nebo mapy jako je google.com/maps.
@@ -48,7 +49,7 @@ Jako uživatel mohu vybraná místa zájmu přeposílat jinému uživateli. Tyto
 
 Tisk
 Jako uživatel si mohu zobrazení lokalit vytisknout.
-
+                                              +
 7. Požadavky
 Funkční požadavky:
 Webová aplikace pro zobrazování, označování a vyhledávání zájmových destinací.
@@ -57,7 +58,7 @@ MVP zatím nepoužívá databázi.
 Webová aplikace je spustitelná v běžném prohlížeči.
 Přizpůsobitelné rozměry zobrazení lokalit, včetně poměru na výšku.
 
-Prezentační režim.
+Prezentační režim:
 Automatizační rozhraní pro vyhledání, validaci, uložení a práci s lokalitami v pozdějším řezu.
 
 Nefunkční požadavky:
@@ -96,9 +97,22 @@ Pro první řez není vyžadováno server-side AI generování.
 
 11. Klíčová rizika a Otevřené otázky
 Rizika:
-Bude případně doplněno
+Pro sdílené odkazy se nesmí používat databázové ID (auto-increment). Odkaz musí obsahovat neuhodnutelný identifikátor (NanoID).
+Frontend nikdy nesmí žádat po backendu o všechna data najednou. Vždy je omezen rádiusem nebo tématem.
+Tam kde bude dovoleno mazat data, musí být ošetřena všechna související data, které jsou na mazaných datech závislé.
+LLM data mazat v žádném případě nemůže. Může je jen označit za neplatné.
 
 Otevřené otázky:
 Jaký lokální model použít a jakými daty ho nakrmit?
-Jaký persistence model zvolit pro první webový řez?
-Jaký framework použít pro backend v Rustu?
+
+12. Bezpečnost a legislativa
+Ochrana osobních údajů:
+Aplikace musí splňovat pravidla GDPR.
+Uživatel musí mít možnost trvale smazat svůj účet a všechna svá data (právo na zapomnění).
+
+Řízení přístupu:
+Běžný uživatel smí vidět a upravovat pouze svá vlastní data. Neexistuje způsob jak přistupovat k datům cizích uživatelů.
+Administrátor systému má přístup do admin panelu, ale nesmí vidět citlivá data uživatelů (např. hesla).
+
+Bezpečnost hesel:
+Heslo uživatele musí mít minimálně 8 znaků, obsahovat jedno číslo a jeden speciální znak.
