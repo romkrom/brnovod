@@ -19,7 +19,7 @@ Poskytnout rozumné výchozí rámování zobrazení lokalit, aby se mohl zobraz
 Možnost přeposlat vybrané místo zájmu jinému uživateli jak na webu tak v mobilní aplikaci.
 Možnost odkázat na externí mapu ve webové aplikaci a spustit navigaci v mobilu.
 Součástí je správa účtů, oprávnění, přihlášení uživatele.
-Webové rozhraní (frontend) je ve frameworku Svelte v jazyku Typescript, backend ve frameworku Axum v jazyku Rust, databáze je PostgreSQL.
+Webové rozhraní (frontend) je ve frameworku Svelte v jazyku Typescript, backend ve frameworku Axum v jazyku Rust, databáze je PostgreSQL a kód kolem LLM je v jazyku python.
 
 4. Co není cílem (Non-Goals)
 Vytvoření dalšího blogu kudyznudy.cz, nebo mapy jako je google.com/maps.
