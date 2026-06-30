@@ -19,7 +19,7 @@ Poskytnout rozumné výchozí rámování zobrazení lokalit, aby se mohl zobraz
 Možnost přeposlat vybrané místo zájmu jinému uživateli jak na webu tak v mobilní aplikaci.
 Možnost odkázat na externí mapu ve webové aplikaci a spustit navigaci v mobilu.
 Součástí je správa účtů, oprávnění, přihlášení uživatele.
-Webové rozhraní (frontend) je ve frameworku Svelte v jazyku Typescript, backend ve frameworku Axum v jazyku Rust, databáze je PostgreSQL a kód kolem LLM je v jazyku python.
+Webové rozhraní (frontend) je ve frameworku Svelte v jazyku Typescript, backend ve frameworku Axum v jazyku Rust, databáze je PostgreSQL a kód kolem AI modelu je v jazyku python.
 
 4. Co není cílem (Non-Goals)
 Vytvoření dalšího blogu kudyznudy.cz, nebo mapy jako je google.com/maps.
@@ -54,6 +54,12 @@ Jako uživatel si mohu zobrazení lokalit vytisknout.
 Funkční požadavky:
 Webová aplikace pro zobrazování, označování a vyhledávání zájmových destinací.
 Budoucí mobilní aplikace se stejným produktovým chováním jako webová aplikace.
+Architektura je rozdělena na dvě nezávislé části propojené přes PostgreSQL databázi, model pro vyhledávání a aplikace pro zobrazování a filtrování výsledků.
+
+Architektonické schéma datových toků:
+AI Pipeline (Python, pozadí) - Autonomně prohledává zdroje -> Spouští interní/externí nástroje (Tools) -> Ukládá nalezené lokality do DB včetně `ai_trace_id` a `ai_model_version`.
+Klientská část (Svelte + Axum) - Uživatel filtruje předpřipravená data z DB -> Může kliknout na hodnocení (Feedback Loop) -> Incident se propisuje zpět k původnímu trasování (Trace ID).
+
 MVP zatím nepoužívá databázi.
 Webová aplikace je spustitelná v běžném prohlížeči.
 Přizpůsobitelné rozměry zobrazení lokalit, včetně poměru na výšku.
@@ -116,3 +122,55 @@ Administrátor systému má přístup do admin panelu, ale nesmí vidět citliv�
 
 Bezpečnost hesel:
 Heslo uživatele musí mít minimálně 8 znaků, obsahovat jedno číslo a jeden speciální znak.
+
+13. Observability, LLMOps a Telemetrie (Asynchronní AI Pipeline)
+
+Metriky pro AI Pipeline na pozadí (Python / Lokální LLM):
+Protože model běží autonomně bez přímé vazby na synchronní požadavek uživatele, metriky se zaměřují na stabilitu, efektivitu hardwaru a prevenci zacyklení.
+
+Detekce zacyklení (Agent Loops):
+**Požadavek:** Každý autonomní běh (hledání jedné lokality/dávky) musí mít striktní limit na počet iterací (kroků).
+**Metrika:** `ai_agent_iterations_total` (Počet kroků v rámci jednoho úkolu).
+**Kritický limit:** Pokud agent vykoná více než **5 iterací / volání nástrojů** na jeden úkol, proces musí být okamžitě ukončen (`RuntimeError`), aby nedošlo k zablokování GPU.
+
+Využití a trendy nástrojů (Tool Tracking):
+**Požadavek:** Sledovat, které nástroje model aktivuje a kolikrát.
+**Metrika:** `ai_tool_calls_count{tool_name="...", status="..."}`.
+**Cíl:** Identifikovat selhávající nástroje a sledovat nárůst/snižování frekvence jejich používání v čase (optimalizace promptů).
+
+Kapacita a rychlost lokálního hardwaru
+**Požadavek:** Měřit tokeny a čas generování, ačkoliv se neplatí za API třetích stran. Sleduje se degradace výkonu GPU (swapování do RAM).
+**Metriky:**
+`ai_generated_tokens_total` (Objem vygenerovaných dat kvůli velikosti kontextového okna).
+`ai_tokens_per_second` (Rychlost generování na lokálním železe).
+**Cíl:** Pokud rychlost klesne pod **10 tokenů/s**, signalizuje to přetížení VRAM.
+
+Infrastrukturní cena (Odpověď na OpenSpend):
+**Požadavek:** Přepočítat fixní cenu serveru (např. cloudové GPU za hodinu) na cenu za jednu úspěšně nalezenou lokalitu.
+**Vzorec:** $\text{Cena za lokalitu} = \frac{\text{Hodinová cena serveru}}{\text{Počet lokalit uložených do DB za hodinu}}$
+
+Agentní efektivita (Tool Tracking):
+Monitorovat korelaci mezi počtem spuštěných Toolů a úspěšností vyhledávání (palci nahoru). Zjistit, zda více volání Toolů vede k lepším výsledkům.
+Detekce zacyklení - Pokud jeden agent spustí stejný Tool více než 5x za sezení, zalogovat jako Error chování modelu.
+
+Metriky pro Webové rozhraní a Uživatele (Svelte + Axum):
+Uživatel konzumuje statická data z DB. Měříme uživatelskou spokojenost a relevanci dat, která model připravil.
+
+Explicitní zpětná vazba (Feedback Loop):
+**Požadavek:** Uživatel má možnost u každé zobrazené lokality kliknout na "Palec nahoru" / "Palec dolů".
+**Ukládání dat:** Databáze musí u každé lokality evidovat `thumbs_up` a `thumbs_down`.
+**Propojení s AI:** Každý feedback musí být v analytice (např. Langfuse) spárován s příslušným `ai_trace_id`, které lokalitu původně vygenerovalo.
+**Byznysový cíl:** Poměr palců nahoru ku všem hodnocením musí být **> 85 %**. Lokality s vysokým počtem palců dolů jsou automaticky skryty a odeslány k revizi promptu.
+
+Efektivita filtrů a prázdné výsledky (Empty Results):
+**Požadavek:** Sledovat, zda uživatelé nenarážejí na prázdné výsledky při kombinaci témat.
+**Metrika:** Logovat událost, kdy uživatel zvolí filtr témat a DB vrátí **0 výsledků**.
+**Cíl:** Předat AI pipeline informaci, na která témata/lokality se má při dalším asynchronním běhu na pozadí zaměřit (Dynamic Backlog).
+
+Bezpečnost a Infrastruktura (Zátěž & DDoS):
+**Detekce anomálií (DDoS):** Měření anomálního nárůstu požadavků (RPS) na Axum backend. Ochrana proti DDoS (např. Cloudflare nebo Rate-Limiting middleware v Axumu) musí útok zachytit na síťové vrstvě, aby nebyl ovlivněn přístup uživatelů k databázi.
+**Sběr metrik:** Monitorovací systém (Prometheus/Langfuse) **nesmí** selektovat nebo stahovat surová data z PostgreSQL. Sběr probíhá výhradně formou push/pull agregovaných číselných metrik, aby se předešlo zbytečné zátěži produkční databáze.
+
+Relevance a kvalita (výsledků):
+Cíl uživatelské spokojenosti: > 85% palců nahoru (Ratio Up/Down).
+
