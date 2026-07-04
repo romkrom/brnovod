@@ -3,6 +3,7 @@ import secrets
 import hmac
 import hashlib
 from typing import Dict, Any
+import pyautogui
 
 class DestructiveActionGuardrail:
     def __init__(self, admin_secret_key: str):
@@ -47,4 +48,53 @@ class DestructiveActionGuardrail:
         
         # Bezpečné akce (např. SELECT, READ) projdou bez guardrailu
         return f"ÚSPĚCH: Standardní akce '{action}' byla provedena."
+
+
+class ToolsGuardrails:
+    def __init__(self):
+        # Inicializace základního nastavení PyAutoGUI
+        pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0.1
+        
+        # Paměť pro detekci zacyklení
+        self.last_x = None
+        self.last_y = None
+        self.loop_counter = 0
+
+    def validate_coordinates(self, x, y):
+        """Kontrola, zda jsou procentuální souřadnice v rozmezí 0.0 až 1.0."""
+        if x is None or y is None:
+            print("[GUARDRAIL] Chyba: Souřadnice jsou prázdné (None).")
+            return False
+            
+        try:
+            x_val = float(x)
+            y_val = float(y)
+            if 0.0 <= x_val <= 1.0 and 0.0 <= y_val <= 1.0:
+                return True
+            print(f"[GUARDRAIL] Varování: Souřadnice [{x_val}, {y_val}] jsou mimo obrazovku (0-1).")
+            return False
+        except (ValueError, TypeError):
+            print(f"[GUARDRAIL] Chyba: Souřadnice mají neplatný datový typ: {x}, {y}")
+            return False
+
+    def is_system_zone_clash(self, y_pct):
+        """Zabrání klikání do spodních 10 % obrazovky (hlavní panel OS)."""
+        if float(y_pct) > 0.90:
+            print(f"[GUARDRAIL] Blokováno: Pokus o kliknutí do systémové lišty (y={y_pct}).")
+            return True
+        return False
+
+    def is_agent_looping(self, current_x_px, current_y_px):
+        """Detekuje, zda model nekliká stále na stejné pixelové souřadnice."""
+        if current_x_px == self.last_x and current_y_px == self.last_y:
+            self.loop_counter += 1
+            if self.loop_counter >= 3:
+                print(f"[GUARDRAIL] KRIZE: Detekována nekonečná smyčka na pixelu [{current_x_px}, {current_y_px}]!")
+                return True
+        else:
+            # Model kliknul jinam -> resetujeme počítadlo
+            self.last_x = current_x_px
+            self.last_y = current_y_px
+            self.loop_counter = 0
 
